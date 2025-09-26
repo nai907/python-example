@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPVC Prediction Online Platform</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icon.ico') }}" />
+    <!-- Plotly.js library -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <!-- Form to delete uploaded graph and go back -->
+        <form method="POST" action="{{ url_for('delete_uploaded_graph') }}">
+            <input type="hidden" name="uploaded_file" value="{{ uploaded_file_path }}">
+            <button type="submit" class="btn btn-secondary btn-back">Go Back</button>
+        </form>
+        <!-- Title for the combined graph -->
+        <h1 class="text-center">Combined Graph</h1>
+        <!-- Container for Plotly graph -->
+        <div id="combined_graph"></div>
+        
+        <!-- Checkbox controls for toggling plot visibility -->
+        <div id="checkboxes" class="text-center mt-3">
+            <h3>Toggle Plot Visibility</h3>
+            <div id="checkbox-container"></div>
+            <h3 class="mt-4">Toggle Legend Visibility</h3>
+            <div id="legend-checkboxes" class="text-center mt-3">
+                <label><input type="checkbox" id="toggle_conversion" checked> Conversion (%)</label><br>
+                <label><input type="checkbox" id="toggle_temperature" checked> Temperature (°C)</label><br>
+                <label><input type="checkbox" id="toggle_polymerization_rate" checked> Polymerization Rate (kg/m³/min)</label><br>
+                <label><input type="checkbox" id="toggle_pressure" checked> Pressure (bar)</label><br>
+            </div>
+        </div>
+    </div>
+    <br>
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Retrieve combined plot JSON data passed from Flask
+        var combinedGraph = {{ combined_graph_json | safe }};
+
+        // Render Plotly plot
+        Plotly.newPlot('combined_graph', combinedGraph.data, combinedGraph.layout);
+
+        // Store initial x and y axis ranges to lock the plot
+        var lockedXRange = combinedGraph.layout.xaxis.range;
+        var lockedYRange = combinedGraph.layout.yaxis.range;
+        var lockedY2Range = combinedGraph.layout.yaxis2 ? combinedGraph.layout.yaxis2.range : null;
+
+        // Function to extract base name from the plot name
+        function extractBaseName(name) {
+            // Extract base name before the first space or parenthesis
+            var baseName = name.split(' ')[0];
+            return baseName;
+        }
+
+        // Function to get unique base names for a given range of plots
+        function getUniqueBaseNames(start, end) {
+            let names = new Set();
+            combinedGraph.data.slice(start, end).forEach(plot => {
+                let baseName = extractBaseName(plot.name);
+                names.add(baseName);
+            });
+            return Array.from(names);
+        }
+
+        // Function to create checkboxes dynamically based on unique base names
+        function createCheckboxes() {
+            var container = document.getElementById('checkbox-container');
+            var plotNamesGroup1 = getUniqueBaseNames(0, 4);
+            var plotNamesGroup2 = getUniqueBaseNames(4, 8);
+
+            var checkboxHtml = `
+                <label><input type="checkbox" id="toggle_plot_group_1" checked> ${plotNamesGroup1.join(', ')}</label><br>
+                <label><input type="checkbox" id="toggle_plot_group_2" checked> ${plotNamesGroup2.join(', ')}</label><br>
+            `;
+
+            container.innerHTML = checkboxHtml;
+        }
+
+        // Function to update plot and legend visibility based on checkboxes
+        function updateVisibilityAndLegend() {
+            var showGroup1 = document.getElementById('toggle_plot_group_1').checked;
+            var showGroup2 = document.getElementById('toggle_plot_group_2').checked;
+
+            var showConversion = document.getElementById('toggle_conversion').checked;
+            var showTemperature = document.getElementById('toggle_temperature').checked;
+            var showPolymerizationRate = document.getElementById('toggle_polymerization_rate').checked;
+            var showPressure = document.getElementById('toggle_pressure').checked;
+
+            var visibility = combinedGraph.data.map((plot, idx) => {
+                // Determine if the plot should be visible based on its group checkbox
+                let groupVisible = idx >= 0 && idx <= 3 ? showGroup1 : (idx >= 4 && idx <= 7 ? showGroup2 : false);
+
+                // Determine if the plot's legend should be shown based on legend checkboxes
+                let legendVisible = 'legendonly'; // Default to 'legendonly'
+                if (idx === 0 || idx === 4) legendVisible = showConversion ? true : legendVisible;
+                if (idx === 1 || idx === 5) legendVisible = showTemperature ? true : legendVisible;
+                if (idx === 2 || idx === 6) legendVisible = showPolymerizationRate ? true : legendVisible;
+                if (idx === 3 || idx === 7) legendVisible = showPressure ? true : legendVisible;
+
+                return groupVisible ? legendVisible : 'legendonly';
+            });
+
+            // Update plot visibility
+            Plotly.restyle('combined_graph', 'visible', visibility);
+
+            // Relock the axis ranges after updating visibility
+            Plotly.relayout('combined_graph', {
+                'xaxis.range': lockedXRange,
+                'yaxis.range': lockedYRange,
+                'yaxis2.range': lockedY2Range
+            });
+        }
+
+        // Event listeners for checkbox changes to update visibility and legend
+        document.getElementById('checkbox-container').addEventListener('change', function(event) {
+            if (event.target.tagName === 'INPUT') {
+                updateVisibilityAndLegend();
+            }
+        });
+
+        document.getElementById('legend-checkboxes').addEventListener('change', function(event) {
+            if (event.target.tagName === 'INPUT') {
+                updateVisibilityAndLegend();
+            }
+        });
+
+        // Initialize checkboxes and visibility
+        createCheckboxes();
+        updateVisibilityAndLegend();
+    </script>
+</body>
+</html>

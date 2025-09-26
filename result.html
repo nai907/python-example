@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPVC Prediction Online Platform</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icon.ico') }}" />
+    <!-- Plotly.js library -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <!-- Back button -->
+        <a href="/plots?" class="btn btn-secondary btn-back">Go Back</a>
+        <!-- Page title -->
+        <h1 class="text-center">Simulation Result for {{ plot.name }}</h1>
+        <!-- Container for Plotly chart -->
+        <div id="plotly-chart-{{ plot.plot_id }}"></div>
+        <!-- Checkbox controls for toggling legend visibility -->
+        <div class="text-center mt-3">
+            <div id="checkboxes" class="text-center mt-3">
+                <h3>Toggle Legend Visibility</h3>
+                <label><input type="checkbox" data-idx="0" checked> Conversion (%)</label><br>
+                <label><input type="checkbox" data-idx="1" checked> Temperature (°C)</label><br>
+                <label><input type="checkbox" data-idx="2" checked> Polymerization Rate (kg/m³/min)</label><br>
+                <label><input type="checkbox" data-idx="3" checked> Pressure (bar)</label><br>
+            </div>
+            <br>
+            <!-- Buttons to download image and output file -->
+            <a href="{{ url_for('static', filename=plot.img_path) }}" class="btn btn-primary" download>Download Image</a>
+            <a href="{{ url_for('static', filename=plot.roi_path) }}" class="btn btn-info" download>Download Output File</a>
+            <!-- Form to upload and compare another plot -->
+            <form action="/compare" method="post" enctype="multipart/form-data" class="mt-3" onsubmit="return validateForm()">
+                <input type="hidden" name="existing_plot" value="{{ plot.plot_json }}">
+                <input type="file" name="file" accept=".roi" class="form-control" required>
+                <input type="submit" value="Compare Graph" class="btn btn-warning mt-2">
+            </form>
+        </div>
+    </div>
+    <br>
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Retrieve plot JSON data passed from Flask
+        var plotJson = {{ plot.plot_json | tojson | safe }};
+        var plotId = "{{ plot.plot_id }}";
+    
+        // Render Plotly plot
+        Plotly.plot('plotly-chart-' + plotId, JSON.parse(plotJson), {}, {
+            responsive: true, 
+            autosize: true
+        }).then(function() {
+            // Store initial axis range
+            var plotElement = document.getElementById('plotly-chart-' + plotId);
+            var initialRange = {
+                xaxis: plotElement.layout.xaxis.range,
+                yaxis: plotElement.layout.yaxis.range
+            };
+            
+            // Update visibility based on checkbox states
+            function updateVisibility() {
+                var checkboxes = document.querySelectorAll('#checkboxes input[type="checkbox"]');
+                var visibility = Array.from(checkboxes).map(checkbox => checkbox.checked ? true : 'legendonly');
+                Plotly.restyle('plotly-chart-' + plotId, {visible: visibility}).then(function() {
+                    // Reset axis range after visibility change
+                    Plotly.relayout('plotly-chart-' + plotId, {
+                        'xaxis.range': initialRange.xaxis,
+                        'yaxis.range': initialRange.yaxis
+                    });
+                });
+            }
+    
+            // Event listener for checkbox changes
+            document.getElementById('checkboxes').addEventListener('change', function(event) {
+                if (event.target.tagName === 'INPUT') {
+                    updateVisibility();
+                }
+            });
+        });
+    
+        // Validate form to ensure file is uploaded
+        function validateForm() {
+            var fileInput = document.querySelector('input[name="file"]');
+            if (!fileInput.files.length) {
+                alert("Please upload a file before comparing.");
+                return false;
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>

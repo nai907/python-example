@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>SPVC Prediction Online Platform</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icon.ico') }}" />
+    <style>
+        /* Centering body content */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: white;
+            color: #007bff; /* Bootstrap primary blue */
+            margin: 0; /* Ensures there is no default margin */
+            flex-direction: column; /* Center content vertically */
+        }
+        /* Styling for the output div */
+        #output {
+            margin-top: 20px;
+            color: black;
+            white-space: pre-wrap; /* Preserves whitespace formatting */
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading spinner -->
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    
+    <p>Loading, please wait...</p>
+    <div id="output" class="d-none"></div>
+    <!-- Hidden form to submit the result -->
+    <form action="/result" method="post" id="resultform">
+    </form>
+    <script>
+        // Fetch reactor output
+        async function fetchOutput() {
+            try {
+                console.log('Starting fetch request...');
+                const response = await fetch('/run_reactor');
+        
+                console.log('Response received:', response);
+        
+                if (!response.ok) {
+                    console.error(`HTTP error! status: ${response.status}`);
+                    return;
+                }
+        
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let done = false;
+        
+                // Read the stream of data from the server
+                while (!done) {
+                    const { value, done: streamDone } = await reader.read();
+                    if (value) {
+                        // Decode the chunk and log it
+                        const chunk = decoder.decode(value, { stream: true });
+                        console.log('Chunk received:', chunk);
+        
+                        // Here you can process the chunk or update the UI with the new data
+                    }
+                    done = streamDone;
+                }
+        
+                console.log('Fetch completed.');
+                // Submit the form after fetching output, if necessary
+                document.getElementById("resultform").submit();
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
+        }
+
+        // Periodically fetch additional output
+        async function periodicFetchOutput() {
+            const response = await fetch('/get_output');
+            const data = await response.json();
+            data.output.forEach(line => {
+                console.log(line);  // Log each line to the console
+                document.getElementById('output').textContent += line + '\n';
+            });
+        }
+
+        // Initial fetch output request
+        fetchOutput();
+        // Set interval to periodically fetch output every 2 seconds
+        setInterval(periodicFetchOutput, 2000);
+    </script>
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
